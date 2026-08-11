@@ -1,0 +1,9 @@
+services:
+  app:
+    name: Vault RIM Lifecycle Tool
+    description: Runs the Express API + built React app on port 9090.
+    triggeredBy:
+      - postEnvironmentStart
+    commands:
+      start: PORT=9090 node server/src/index.js
+      ready: curl -sf http://localhost:9090/api/health

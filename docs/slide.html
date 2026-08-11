@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Architecture Slide — Download</title>
+    <style>
+      :root { --bg:#0f141a; --panel:#161d26; --border:#2a3542; --text:#e6edf3; --muted:#8b98a8; --primary:#ff2d46; }
+      * { box-sizing:border-box; }
+      body { margin:0; background:radial-gradient(1200px 600px at 70% -10%, #1a232f 0%, var(--bg) 60%);
+             color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; }
+      .wrap { max-width:1200px; margin:0 auto; padding:32px 24px 60px; }
+      h1 { font-size:22px; margin:0 0 4px; } h1 .dot { color:var(--primary); }
+      .sub { color:var(--muted); font-size:14px; margin-bottom:24px; }
+      .bar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+      a.btn { text-decoration:none; background:var(--panel); color:var(--text); border:1px solid var(--border);
+              border-radius:10px; padding:10px 16px; font-size:14px; font-weight:600; transition:.15s; }
+      a.btn:hover { border-color:var(--primary); }
+      a.btn.primary { background:var(--primary); border-color:var(--primary); color:#fff; }
+      .frame { border:1px solid var(--border); border-radius:14px; overflow:hidden; background:#000; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+      .frame img { display:block; width:100%; height:auto; }
+      .hint { color:var(--muted); font-size:12.5px; margin-top:14px; line-height:1.6; }
+      code { background:#1c2530; padding:2px 6px; border-radius:5px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Vault RIM Lifecycle Tool <span class="dot">·</span> Architecture Slide</h1>
+      <div class="sub">Single 16:9 slide (1920×1080). Vector SVG imports into PowerPoint / Google Slides / Keynote; PNGs drop straight into any deck.</div>
+      <div class="bar">
+        <a class="btn primary" href="architecture-slide.svg" download>Download SVG (vector)</a>
+        <a class="btn" href="architecture-slide.png" download>Download PNG (1080p)</a>
+        <a class="btn" href="architecture-slide@2x.png" download>Download PNG (4K)</a>
+        <a class="btn" href="architecture.html">Open interactive diagram &#8599;</a>
+      </div>
+      <div class="frame"><img src="architecture-slide.png" alt="Architecture slide preview" /></div>
+      <div class="hint">
+        <b>Tip:</b> For editable shapes in PowerPoint, insert the <code>.svg</code> then right-click &#8594; <em>Convert to Shape</em>.
+        For Google Slides, upload the PNG (SVG import isn't supported there).
+      </div>
+    </div>
+  </body>
+</html>

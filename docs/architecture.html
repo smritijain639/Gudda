@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vault RIM Lifecycle Tool — Architecture</title>
+    <style>
+      :root {
+        --bg: #0f141a;
+        --panel: #161d26;
+        --panel-2: #1c2530;
+        --border: #2a3542;
+        --text: #e6edf3;
+        --muted: #8b98a8;
+        --primary: #ff2d46;
+        --primary-dim: rgba(255, 45, 70, 0.15);
+        --blue: #4aa3ff;
+        --green: #35d07f;
+        --amber: #ffb020;
+        --purple: #b07cff;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: radial-gradient(1200px 600px at 70% -10%, #1a232f 0%, var(--bg) 60%);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        overflow: hidden;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 24px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(15, 20, 26, 0.7);
+        backdrop-filter: blur(6px);
+      }
+      header h1 { font-size: 17px; margin: 0; letter-spacing: 0.2px; }
+      header h1 .dot { color: var(--primary); }
+      header .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+      .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .toolbar .label { color: var(--muted); font-size: 12px; margin-right: 4px; }
+      button.flow, button.util {
+        background: var(--panel-2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 7px 14px;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      button.flow:hover, button.util:hover { border-color: var(--primary); }
+      button.flow.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+        box-shadow: 0 0 18px rgba(255, 45, 70, 0.5);
+      }
+
+      .stage {
+        position: relative;
+        height: calc(100vh - 62px);
+        overflow: auto;
+      }
+      .canvas {
+        position: relative;
+        width: 1280px;
+        height: 760px;
+        margin: 0 auto;
+      }
+      svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+      .lane-label {
+        position: absolute;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--muted);
+        opacity: 0.7;
+      }
+      .lane-box {
+        position: absolute;
+        border: 1px dashed var(--border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.012);
+      }
+
+      .node {
+        position: absolute;
+        background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        cursor: pointer;
+        transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+        user-select: none;
+      }
+      .node:hover { transform: translateY(-2px); border-color: var(--primary); }
+      .node.dim { opacity: 0.32; filter: saturate(0.5); }
+      .node.hot {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 1px var(--primary), 0 0 26px rgba(255, 45, 70, 0.35);
+      }
+      .node .title { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+      .node .tag { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+      .node .ico {
+        width: 18px; height: 18px; border-radius: 5px; display: inline-grid; place-items: center;
+        font-size: 11px; font-weight: 800; color: #0f141a;
+      }
+      .node.user { border-left: 3px solid var(--blue); }
+      .node.client { border-left: 3px solid var(--blue); }
+      .node.server { border-left: 3px solid var(--primary); }
+      .node.ext { border-left: 3px solid var(--green); }
+      .node.store { border-left: 3px solid var(--amber); }
+      .node.ai { border-left: 3px solid var(--purple); }
+
+      /* moving packet */
+      .packet {
+        position: absolute; width: 12px; height: 12px; border-radius: 50%;
+        background: var(--primary);
+        box-shadow: 0 0 12px 3px rgba(255, 45, 70, 0.7);
+        opacity: 0; z-index: 5;
+      }
+
+      /* detail drawer */
+      .drawer {
+        position: fixed; top: 62px; right: 0; width: 380px; height: calc(100vh - 62px);
+        background: var(--panel); border-left: 1px solid var(--border);
+        transform: translateX(100%); transition: transform 0.25s ease;
+        padding: 22px; overflow-y: auto; z-index: 20;
+      }
+      .drawer.open { transform: translateX(0); }
+      .drawer h2 { font-size: 16px; margin: 0 0 2px; }
+      .drawer .kicker { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+      .drawer p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+      .drawer ul { color: var(--muted); font-size: 13px; line-height: 1.7; padding-left: 18px; }
+      .drawer code {
+        background: #0c1117; border: 1px solid var(--border); border-radius: 5px;
+        padding: 1px 6px; font-size: 12px; color: #e6edf3;
+      }
+      .drawer .close {
+        position: absolute; top: 16px; right: 16px; background: none; border: none;
+        color: var(--muted); font-size: 22px; cursor: pointer;
+      }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+      .chip { font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+
+      .legend {
+        position: absolute; left: 16px; bottom: 12px; display: flex; gap: 14px; flex-wrap: wrap;
+        font-size: 11.5px; color: var(--muted);
+      }
+      .legend .k { display: inline-flex; align-items: center; gap: 6px; }
+      .legend .sw { width: 12px; height: 12px; border-radius: 3px; }
+
+      .flow-caption {
+        position: absolute; left: 50%; transform: translateX(-50%); top: 8px;
+        background: rgba(0,0,0,0.5); border: 1px solid var(--border); border-radius: 20px;
+        padding: 6px 16px; font-size: 12.5px; color: var(--text); opacity: 0; transition: opacity 0.2s;
+        max-width: 80%; text-align: center;
+      }
+      .flow-caption.show { opacity: 1; }
+      .hint { position: absolute; right: 16px; bottom: 12px; font-size: 11px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Vault RIM Lifecycle Tool <span class="dot">●</span> Architecture</h1>
+        <div class="sub">Click any component for details · Play a scenario to animate the request flow</div>
+      </div>
+      <div class="toolbar">
+        <span class="label">Scenarios:</span>
+        <button class="flow" data-flow="login">Login</button>
+        <button class="flow" data-flow="search">Smart Search</button>
+        <button class="flow" data-flow="ai">Ask AI (NL→VQL)</button>
+        <button class="flow" data-flow="lifecycle">Lifecycle change</button>
+        <button class="flow" data-flow="delete">Delete (cascade)</button>
+        <button class="util" id="resetBtn">Reset</button>
+      </div>
+    </header>
+
+    <div class="stage">
+      <div class="canvas" id="canvas">
+        <svg class="wires" id="wires" viewBox="0 0 1280 760" preserveAspectRatio="none"></svg>
+
+        <!-- lane boxes -->
+        <div class="lane-box" style="left:20px; top:60px; width:250px; height:640px"></div>
+        <div class="lane-box" style="left:300px; top:60px; width:300px; height:640px"></div>
+        <div class="lane-box" style="left:630px; top:60px; width:340px; height:640px"></div>
+        <div class="lane-box" style="left:1000px; top:60px; width:260px; height:640px"></div>
+
+        <div class="lane-label" style="left:34px; top:38px">Browser</div>
+        <div class="lane-label" style="left:314px; top:38px">React Client (Vite)</div>
+        <div class="lane-label" style="left:644px; top:38px">Node / Express API</div>
+        <div class="lane-label" style="left:1014px; top:38px">External Services</div>
+
+        <div class="flow-caption" id="caption"></div>
+        <div class="packet" id="packet"></div>
+
+        <div class="legend">
+          <span class="k"><span class="sw" style="background:var(--blue)"></span>Frontend</span>
+          <span class="k"><span class="sw" style="background:var(--primary)"></span>Backend</span>
+          <span class="k"><span class="sw" style="background:var(--green)"></span>External API</span>
+          <span class="k"><span class="sw" style="background:var(--amber)"></span>Session store</span>
+          <span class="k"><span class="sw" style="background:var(--purple)"></span>LLM</span>
+        </div>
+        <div class="hint">Tip: press 1–5 to play scenarios · Esc to reset</div>
+      </div>
+    </div>
+
+    <div class="drawer" id="drawer">
+      <button class="close" id="drawerClose">×</button>
+      <div class="kicker" id="dKicker"></div>
+      <h2 id="dTitle"></h2>
+      <div class="chips" id="dChips"></div>
+      <div id="dBody"></div>
+    </div>
+
+    <script>
+      // ---- Node definitions (id, lane position, style, details) --------------
+      const NODES = {
+        user: {
+          x: 40, y: 340, w: 210, cls: 'user', ico: '👤', icoBg: 'var(--blue)',
+          title: 'User', tag: 'RIM / Regulatory staff',
+          kicker: 'Actor', chips: ['Standard', 'Admin'],
+          body: `<p>Regulatory staff who need to change lifecycle states, correct metadata, or remove
+          erroneously created records. <b>Admins</b> (by Vault security profile) additionally get the
+          edit-metadata and delete features.</p>`,
+        },
+        login: {
+          x: 320, y: 110, w: 260, cls: 'client', ico: '🔑', icoBg: 'var(--blue)',
+          title: 'Login', tag: 'username + password',
+          kicker: 'React · component', chips: ['Login.jsx'],
+          body: `<p>Collects Vault credentials. The Vault DNS is fixed server-side
+          (<code>sb-roche-rim-development</code>) so users only enter username/password.</p>`,
+        },
+        search: {
+          x: 320, y: 210, w: 260, cls: 'client', ico: '🔎', icoBg: 'var(--blue)',
+          title: 'Smart Search', tag: 'Ask AI · Quick · Advanced · Global',
+          kicker: 'React · component', chips: ['SmartSearch.jsx'],
+          body: `<p>Four modes:</p><ul>
+            <li><b>Ask (AI)</b> — plain-English question → Galileo → VQL</li>
+            <li><b>Quick</b> — term across selected fields</li>
+            <li><b>Advanced</b> — field/operator/value filter builder</li>
+            <li><b>Global</b> — one term across many objects</li></ul>`,
+        },
+        workspace: {
+          x: 320, y: 330, w: 260, cls: 'client', ico: '🗂️', icoBg: 'var(--blue)',
+          title: 'Record Workspace', tag: 'results + selected record',
+          kicker: 'React · component', chips: ['RecordWorkspace.jsx'],
+          body: `<p>Shows search results, lets the user select a record, and hosts the three action
+          panels via tabs: Lifecycle, Edit metadata, Delete.</p>`,
+        },
+        panels: {
+          x: 320, y: 450, w: 260, cls: 'client', ico: '⚙️', icoBg: 'var(--blue)',
+          title: 'Action Panels', tag: 'Lifecycle · Edit · Delete',
+          kicker: 'React · components', chips: ['MetadataEditor.jsx', 'DeletePanel.jsx'],
+          body: `<p><b>Lifecycle</b>: pick an available action & apply.<br/>
+          <b>Edit metadata</b> (admin): change any field, preview diff, confirm.<br/>
+          <b>Delete</b> (admin): hard delete with hierarchy preview + type-to-confirm, or soft delete.</p>`,
+        },
+        apiclient: {
+          x: 320, y: 580, w: 260, cls: 'client', ico: '🔌', icoBg: 'var(--blue)',
+          title: 'API client', tag: 'fetch + session cookie',
+          kicker: 'React · module', chips: ['api.js'],
+          body: `<p>Thin <code>fetch</code> wrapper. All calls go to <code>/api/*</code> with the
+          httpOnly session cookie; the Vault session ID never touches the browser.</p>`,
+        },
+
+        express: {
+          x: 650, y: 110, w: 300, cls: 'server', ico: '🚦', icoBg: 'var(--primary)',
+          title: 'Express app', tag: 'routes · CORS · static hosting',
+          kicker: 'Node · entry', chips: ['index.js', 'routes.js'],
+          body: `<p>Hosts the REST API and serves the built React app in production. Central error
+          handler surfaces Vault/LLM messages without leaking stack traces.</p>`,
+        },
+        authmw: {
+          x: 650, y: 210, w: 300, cls: 'server', ico: '🛡️', icoBg: 'var(--primary)',
+          title: 'Auth + Admin gate', tag: 'requireSession · requireAdmin',
+          kicker: 'Node · middleware', chips: ['routes.js'],
+          body: `<p>Resolves the session cookie to a Vault client. <code>requireAdmin</code> gates
+          edit/delete routes — enforced server-side (403), not just hidden in the UI. Admin is decided
+          at login from the user's security profile.</p>`,
+        },
+        vaultClient: {
+          x: 650, y: 330, w: 300, cls: 'server', ico: '📦', icoBg: 'var(--primary)',
+          title: 'Vault client', tag: 'auth · VQL · actions · CRUD · hierarchy',
+          kicker: 'Node · module', chips: ['vaultClient.js'],
+          body: `<p>Wraps the Veeva Vault REST API: authenticate, VQL query, list/execute lifecycle
+          actions, update & delete records, object metadata, and <b>bottom-up deletion planning</b>
+          (children before parents). Also the safe VQL builder for smart search.</p>`,
+        },
+        nlsearch: {
+          x: 650, y: 450, w: 300, cls: 'server', ico: '🧠', icoBg: 'var(--primary)',
+          title: 'NL→VQL pipeline', tag: 'prompt · validate · fallback',
+          kicker: 'Node · module', chips: ['nlSearch.js'],
+          body: `<p>Turns a question into a <b>constrained JSON spec</b> (not raw VQL), validates the
+          object & fields against live metadata, compiles to VQL, and — if the picked object is empty —
+          probes sibling objects sharing the concept (e.g. registration variants).</p>`,
+        },
+        galileoClient: {
+          x: 650, y: 580, w: 300, cls: 'server', ico: '🤖', icoBg: 'var(--primary)',
+          title: 'Galileo client', tag: 'env-driven, provider-agnostic',
+          kicker: 'Node · module', chips: ['galileoClient.js'],
+          body: `<p>Fully env-driven LLM client (URL, auth header, body style, response path). Adds the
+          Bearer space fix and keeps the API key server-side only.</p>`,
+        },
+        sessions: {
+          x: 650, y: 690, w: 300, cls: 'store', ico: '🍪', icoBg: 'var(--amber)',
+          title: 'Session store', tag: 'cookie token → Vault session',
+          kicker: 'Node · in-memory', chips: ['sessionStore.js'],
+          body: `<p>Maps an opaque cookie token to the Vault session ID + admin flag (30-min TTL). Swap
+          for Redis in a multi-instance deployment.</p>`,
+        },
+
+        vault: {
+          x: 1020, y: 250, w: 220, cls: 'ext', ico: 'V', icoBg: 'var(--green)',
+          title: 'Veeva Vault RIM', tag: 'REST API v24.1',
+          kicker: 'External · SaaS', chips: ['sb-roche-rim-development'],
+          body: `<p>The system of record. Public Veeva SaaS. All object data, lifecycle definitions,
+          and permissions live here; the tool never stores RIM data itself.</p>`,
+        },
+        galileo: {
+          x: 1020, y: 470, w: 220, cls: 'ai', ico: '✦', icoBg: 'var(--purple)',
+          title: 'Roche Galileo', tag: 'AI Gateway (Portkey)',
+          kicker: 'External · LLM', chips: ['us.aigw.galileo', 'gemini-2.5-flash'],
+          body: `<p>Roche AI Gateway fronting Gemini. Reached via <code>us.aigw.galileo.roche.com</code>
+          with Bearer auth. Used only to translate natural language into a search spec.</p>`,
+        },
+      };
+
+      // ---- Wires (static connections) --------------------------------------
+      const WIRES = [
+        ['user', 'login'], ['user', 'search'], ['user', 'workspace'], ['user', 'panels'],
+        ['login', 'apiclient'], ['search', 'apiclient'], ['workspace', 'apiclient'], ['panels', 'apiclient'],
+        ['apiclient', 'express'],
+        ['express', 'authmw'], ['authmw', 'vaultClient'], ['authmw', 'nlsearch'],
+        ['nlsearch', 'galileoClient'], ['nlsearch', 'vaultClient'],
+        ['express', 'sessions'], ['authmw', 'sessions'],
+        ['vaultClient', 'vault'], ['galileoClient', 'galileo'],
+      ];
+
+      // ---- Scenario flows (ordered node hops + captions) -------------------
+      const FLOWS = {
+        login: {
+          caption: 'Login: credentials → Express → Vault /auth → store session cookie',
+          nodes: ['user', 'login', 'apiclient', 'express', 'authmw', 'vaultClient', 'vault', 'sessions'],
+        },
+        search: {
+          caption: 'Smart Search: build VQL → Express → Vault query → results',
+          nodes: ['user', 'search', 'apiclient', 'express', 'authmw', 'vaultClient', 'vault'],
+        },
+        ai: {
+          caption: 'Ask AI: question → Galileo → JSON spec → validate → VQL → Vault',
+          nodes: ['user', 'search', 'apiclient', 'express', 'authmw', 'nlsearch', 'galileoClient', 'galileo', 'nlsearch', 'vaultClient', 'vault'],
+        },
+        lifecycle: {
+          caption: 'Lifecycle change: pick action → Express (auth) → Vault POST /actions',
+          nodes: ['user', 'panels', 'apiclient', 'express', 'authmw', 'vaultClient', 'vault'],
+        },
+        delete: {
+          caption: 'Delete: admin gate → build hierarchy plan → delete children-first in Vault',
+          nodes: ['user', 'panels', 'apiclient', 'express', 'authmw', 'vaultClient', 'vault'],
+        },
+      };
+
+      // ---- Render nodes -----------------------------------------------------
+      const canvas = document.getElementById('canvas');
+      const nodeEls = {};
+      for (const [id, n] of Object.entries(NODES)) {
+        const el = document.createElement('div');
+        el.className = 'node ' + n.cls;
+        el.style.left = n.x + 'px';
+        el.style.top = n.y + 'px';
+        el.style.width = n.w + 'px';
+        el.dataset.id = id;
+        el.innerHTML =
+          `<div class="title"><span class="ico" style="background:${n.icoBg}">${n.ico}</span>${n.title}</div>` +
+          `<div class="tag">${n.tag}</div>`;
+        el.addEventListener('click', (e) => { e.stopPropagation(); openDrawer(id); });
+        canvas.appendChild(el);
+        nodeEls[id] = el;
+      }
+
+      // ---- Draw wires -------------------------------------------------------
+      const svg = document.getElementById('wires');
+      function center(id) {
+        const n = NODES[id];
+        // approximate height 56
+        return { x: n.x + n.w / 2, y: n.y + 28 };
+      }
+      function edgePoint(id, toward) {
+        const n = NODES[id];
+        const c = center(id);
+        // exit from left/right edge toward target
+        const x = toward.x > c.x ? n.x + n.w : n.x;
+        return { x, y: c.y };
+      }
+      WIRES.forEach(([a, b], i) => {
+        const ca = center(a), cb = center(b);
+        const pa = edgePoint(a, cb), pb = edgePoint(b, ca);
+        const mx = (pa.x + pb.x) / 2;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${pa.x} ${pa.y} C ${mx} ${pa.y}, ${mx} ${pb.y}, ${pb.x} ${pb.y}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#2a3542');
+        path.setAttribute('stroke-width', '1.5');
+        path.dataset.a = a; path.dataset.b = b;
+        svg.appendChild(path);
+      });
+
+      // ---- Drawer -----------------------------------------------------------
+      const drawer = document.getElementById('drawer');
+      function openDrawer(id) {
+        const n = NODES[id];
+        document.getElementById('dKicker').textContent = n.kicker;
+        document.getElementById('dTitle').textContent = n.title;
+        document.getElementById('dChips').innerHTML = (n.chips || [])
+          .map((c) => `<span class="chip">${c}</span>`).join('');
+        document.getElementById('dBody').innerHTML = n.body;
+        drawer.classList.add('open');
+        Object.values(nodeEls).forEach((e) => e.classList.remove('hot'));
+        nodeEls[id].classList.add('hot');
+      }
+      document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+      function closeDrawer() {
+        drawer.classList.remove('open');
+        Object.values(nodeEls).forEach((e) => e.classList.remove('hot'));
+      }
+
+      // ---- Animated flow ----------------------------------------------------
+      const packet = document.getElementById('packet');
+      const caption = document.getElementById('caption');
+      let animToken = 0;
+
+      function reset() {
+        animToken++;
+        Object.values(nodeEls).forEach((e) => e.classList.remove('dim', 'hot'));
+        document.querySelectorAll('.flow').forEach((b) => b.classList.remove('active'));
+        caption.classList.remove('show');
+        packet.style.opacity = 0;
+        closeDrawer();
+      }
+
+      function movePacket(from, to, ms) {
+        return new Promise((res) => {
+          const a = center(from), b = center(to);
+          packet.style.transition = 'none';
+          packet.style.left = a.x - 6 + 'px';
+          packet.style.top = a.y - 6 + 'px';
+          packet.style.opacity = 1;
+          requestAnimationFrame(() => {
+            packet.style.transition = `left ${ms}ms ease, top ${ms}ms ease`;
+            packet.style.left = b.x - 6 + 'px';
+            packet.style.top = b.y - 6 + 'px';
+          });
+          setTimeout(res, ms);
+        });
+      }
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      async function playFlow(key, btn) {
+        reset();
+        if (btn) btn.classList.add('active');
+        const flow = FLOWS[key];
+        caption.textContent = flow.caption;
+        caption.classList.add('show');
+
+        const path = flow.nodes;
+        const setHot = new Set(path);
+        Object.entries(nodeEls).forEach(([id, e]) => {
+          if (!setHot.has(id)) e.classList.add('dim');
+        });
+
+        const token = ++animToken;
+        // light up first node
+        nodeEls[path[0]].classList.add('hot');
+        await sleep(350);
+        for (let i = 0; i < path.length - 1; i++) {
+          if (token !== animToken) return;
+          const from = path[i], to = path[i + 1];
+          await movePacket(from, to, 620);
+          if (token !== animToken) return;
+          nodeEls[to].classList.add('hot');
+          await sleep(240);
+        }
+        // pulse end
+        packet.style.opacity = 0;
+      }
+
+      document.querySelectorAll('.flow').forEach((btn) => {
+        btn.addEventListener('click', () => playFlow(btn.dataset.flow, btn));
+      });
+      document.getElementById('resetBtn').addEventListener('click', reset);
+      document.querySelector('.stage').addEventListener('click', () => closeDrawer());
+
+      // keyboard shortcuts
+      const order = ['login', 'search', 'ai', 'lifecycle', 'delete'];
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') return reset();
+        const n = parseInt(e.key, 10);
+        if (n >= 1 && n <= 5) {
+          const key = order[n - 1];
+          const btn = document.querySelector(`.flow[data-flow="${key}"]`);
+          playFlow(key, btn);
+        }
+      });
+    </script>
+  </body>
+</html>

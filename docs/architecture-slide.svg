@@ -1,0 +1,265 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <radialGradient id="bg" cx="70%" cy="-10%" r="90%">
+      <stop offset="0%" stop-color="#1a232f"/>
+      <stop offset="60%" stop-color="#0f141a"/>
+    </radialGradient>
+    <linearGradient id="clientLane" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4aa3ff" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#4aa3ff" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="serverLane" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff2d46" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#ff2d46" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="extLane" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#35d07f" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#35d07f" stop-opacity="0.02"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7889"/>
+    </marker>
+    <marker id="arrowAI" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b07cff"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <!-- ================= HEADER ================= -->
+  <g>
+    <rect x="0" y="0" width="1920" height="96" fill="#0f141a" fill-opacity="0.7"/>
+    <line x1="0" y1="96" x2="1920" y2="96" stroke="#2a3542" stroke-width="1"/>
+    <rect x="56" y="34" width="6" height="30" rx="3" fill="#ff2d46"/>
+    <text x="80" y="47" fill="#e6edf3" font-size="28" font-weight="700">Vault RIM Lifecycle Management Tool <tspan fill="#ff2d46">·</tspan> Architecture</text>
+    <text x="80" y="76" fill="#8b98a8" font-size="16">React + Vite client &#8226; Node / Express API &#8226; Veeva Vault RIM &#8226; Roche Galileo LLM</text>
+    <text x="1864" y="47" text-anchor="end" fill="#8b98a8" font-size="15">Session ID stays server-side &#8226; admin routes gated 403</text>
+    <text x="1864" y="72" text-anchor="end" fill="#8b98a8" font-size="15">Vault REST API v24.1 &#8226; NL&#8594;VQL is validated, never raw</text>
+  </g>
+
+  <!-- ================= LANES ================= -->
+  <!-- Browser lane (thin) -->
+  <g>
+    <rect x="56" y="150" width="300" height="820" rx="16" fill="#4aa3ff" fill-opacity="0.05" stroke="#2a3542"/>
+    <text x="80" y="184" fill="#4aa3ff" font-size="13" font-weight="700" letter-spacing="2">BROWSER</text>
+  </g>
+  <!-- React client lane -->
+  <g>
+    <rect x="384" y="150" width="440" height="820" rx="16" fill="url(#clientLane)" stroke="#2a3542"/>
+    <text x="408" y="184" fill="#4aa3ff" font-size="13" font-weight="700" letter-spacing="2">REACT CLIENT · VITE</text>
+  </g>
+  <!-- Node/Express lane -->
+  <g>
+    <rect x="852" y="150" width="560" height="820" rx="16" fill="url(#serverLane)" stroke="#2a3542"/>
+    <text x="876" y="184" fill="#ff2d46" font-size="13" font-weight="700" letter-spacing="2">NODE / EXPRESS API</text>
+  </g>
+  <!-- External lane -->
+  <g>
+    <rect x="1440" y="150" width="424" height="820" rx="16" fill="url(#extLane)" stroke="#2a3542"/>
+    <text x="1464" y="184" fill="#35d07f" font-size="13" font-weight="700" letter-spacing="2">EXTERNAL SERVICES</text>
+  </g>
+
+  <!-- ================= WIRES (behind cards) ================= -->
+  <g stroke="#6b7889" stroke-width="2.5" fill="none">
+    <!-- user -> React client (into Login region) -->
+    <path d="M 336 545 C 370 430, 372 300, 396 285" marker-end="url(#arrow)"/>
+    <!-- client stack internal (Login -> Search -> Workspace -> Panels -> API client) -->
+    <path d="M 602 312 L 602 330" marker-end="url(#arrow)" stroke-opacity="0.5"/>
+    <path d="M 602 420 L 602 438" marker-end="url(#arrow)" stroke-opacity="0.5"/>
+    <path d="M 602 520 L 602 538" marker-end="url(#arrow)" stroke-opacity="0.5"/>
+    <path d="M 602 628 L 602 646" marker-end="url(#arrow)" stroke-opacity="0.5"/>
+    <!-- API client -> Express (across the API boundary) -->
+    <path d="M 804 687 C 850 687, 852 285, 876 271" marker-end="url(#arrow)"/>
+  </g>
+  <!-- server internal + external wires -->
+  <g stroke="#6b7889" stroke-width="2.5" fill="none">
+    <!-- express -> auth -->
+    <path d="M 1132 312 L 1132 330" marker-end="url(#arrow)"/>
+    <!-- auth -> vaultClient -->
+    <path d="M 1132 420 L 1132 438" marker-end="url(#arrow)"/>
+    <!-- vaultClient -> nlsearch -->
+    <path d="M 1132 528 L 1132 546" marker-end="url(#arrow)"/>
+    <!-- auth -> sessions -->
+    <path d="M 1200 420 C 1200 560, 1214 640, 1214 686" marker-end="url(#arrow)"/>
+    <!-- vaultClient -> vault (external) -->
+    <path d="M 1384 468 C 1430 460, 1450 445, 1476 442" marker-end="url(#arrow)" stroke="#35d07f" stroke-opacity="0.85"/>
+  </g>
+  <!-- AI wires (purple, dashed) -->
+  <g stroke="#b07cff" stroke-width="2.5" fill="none">
+    <!-- nlsearch -> galileoClient (down the left edge, avoids session store) -->
+    <path d="M 940 636 C 916 690, 916 730, 916 770" stroke-dasharray="7 5" marker-end="url(#arrowAI)"/>
+    <!-- galileoClient -> galileo (external) -->
+    <path d="M 1384 805 C 1440 790, 1460 610, 1476 592" stroke-dasharray="7 5" marker-end="url(#arrowAI)"/>
+  </g>
+
+  <!-- ================= NODES ================= -->
+  <!-- helper visual: each card is rect + icon chip + title + tag + note -->
+
+  <!-- USER -->
+  <g filter="url(#cardShadow)">
+    <rect x="76" y="510" width="260" height="90" rx="14" fill="#161d26" stroke="#4aa3ff" stroke-opacity="0.6"/>
+    <circle cx="112" cy="555" r="20" fill="#4aa3ff"/>
+    <text x="112" y="563" text-anchor="middle" font-size="20">&#128100;</text>
+    <text x="146" y="545" fill="#e6edf3" font-size="19" font-weight="700">User</text>
+    <text x="146" y="570" fill="#8b98a8" font-size="13">RIM / Regulatory staff</text>
+    <text x="146" y="589" fill="#6b7889" font-size="12">Standard &#8226; Admin</text>
+  </g>
+
+  <!-- CLIENT COMPONENTS (stacked) -->
+  <!-- Login -->
+  <g filter="url(#cardShadow)">
+    <rect x="400" y="230" width="404" height="82" rx="12" fill="#161d26" stroke="#2a3542"/>
+    <circle cx="434" cy="271" r="18" fill="#4aa3ff"/>
+    <text x="434" y="278" text-anchor="middle" font-size="17">&#128273;</text>
+    <text x="466" y="262" fill="#e6edf3" font-size="17" font-weight="700">Login</text>
+    <text x="466" y="285" fill="#8b98a8" font-size="12.5">Username + password &#8226; Vault DNS fixed server-side</text>
+    <text x="788" y="248" text-anchor="end" fill="#6b7889" font-size="11">Login.jsx</text>
+  </g>
+  <!-- Smart Search -->
+  <g filter="url(#cardShadow)">
+    <rect x="400" y="330" width="404" height="90" rx="12" fill="#161d26" stroke="#2a3542"/>
+    <circle cx="434" cy="375" r="18" fill="#4aa3ff"/>
+    <text x="434" y="382" text-anchor="middle" font-size="17">&#128270;</text>
+    <text x="466" y="360" fill="#e6edf3" font-size="17" font-weight="700">Smart Search</text>
+    <text x="466" y="383" fill="#8b98a8" font-size="12.5">Ask (AI) &#8226; Quick &#8226; Advanced &#8226; Global</text>
+    <text x="466" y="403" fill="#6b7889" font-size="12">Plain English &#8594; Galileo &#8594; VQL</text>
+    <text x="788" y="348" text-anchor="end" fill="#6b7889" font-size="11">SmartSearch.jsx</text>
+  </g>
+  <!-- Record Workspace -->
+  <g filter="url(#cardShadow)">
+    <rect x="400" y="438" width="404" height="82" rx="12" fill="#161d26" stroke="#2a3542"/>
+    <circle cx="434" cy="479" r="18" fill="#4aa3ff"/>
+    <text x="434" y="486" text-anchor="middle" font-size="17">&#128451;</text>
+    <text x="466" y="470" fill="#e6edf3" font-size="17" font-weight="700">Record Workspace</text>
+    <text x="466" y="493" fill="#8b98a8" font-size="12.5">Results + selected record &#8226; action tabs</text>
+    <text x="788" y="456" text-anchor="end" fill="#6b7889" font-size="11">RecordWorkspace.jsx</text>
+  </g>
+  <!-- Action Panels -->
+  <g filter="url(#cardShadow)">
+    <rect x="400" y="538" width="404" height="90" rx="12" fill="#161d26" stroke="#2a3542"/>
+    <circle cx="434" cy="583" r="18" fill="#4aa3ff"/>
+    <text x="434" y="590" text-anchor="middle" font-size="17">&#9881;</text>
+    <text x="466" y="568" fill="#e6edf3" font-size="17" font-weight="700">Action Panels</text>
+    <text x="466" y="591" fill="#8b98a8" font-size="12.5">Lifecycle &#8226; Edit metadata &#8226; Delete</text>
+    <text x="466" y="611" fill="#6b7889" font-size="12">Preview + confirm &#8226; edit/delete are admin-only</text>
+    <text x="788" y="556" text-anchor="end" fill="#6b7889" font-size="11">MetadataEditor / DeletePanel</text>
+  </g>
+  <!-- API client -->
+  <g filter="url(#cardShadow)">
+    <rect x="400" y="646" width="404" height="82" rx="12" fill="#161d26" stroke="#2a3542"/>
+    <circle cx="434" cy="687" r="18" fill="#4aa3ff"/>
+    <text x="434" y="694" text-anchor="middle" font-size="17">&#128268;</text>
+    <text x="466" y="678" fill="#e6edf3" font-size="17" font-weight="700">API client</text>
+    <text x="466" y="701" fill="#8b98a8" font-size="12.5">fetch &#8594; /api/* with httpOnly session cookie</text>
+    <text x="788" y="664" text-anchor="end" fill="#6b7889" font-size="11">api.js</text>
+  </g>
+
+  <!-- SERVER NODES -->
+  <!-- Express app -->
+  <g filter="url(#cardShadow)">
+    <rect x="880" y="230" width="504" height="82" rx="12" fill="#161d26" stroke="#ff2d46" stroke-opacity="0.5"/>
+    <circle cx="916" cy="271" r="18" fill="#ff2d46"/>
+    <text x="916" y="278" text-anchor="middle" font-size="17">&#128678;</text>
+    <text x="948" y="262" fill="#e6edf3" font-size="17" font-weight="700">Express app</text>
+    <text x="948" y="285" fill="#8b98a8" font-size="12.5">Routes &#8226; CORS &#8226; serves built React app</text>
+    <text x="1368" y="248" text-anchor="end" fill="#6b7889" font-size="11">index.js / routes.js</text>
+  </g>
+  <!-- Auth + Admin gate -->
+  <g filter="url(#cardShadow)">
+    <rect x="880" y="330" width="504" height="90" rx="12" fill="#161d26" stroke="#ff2d46" stroke-opacity="0.5"/>
+    <circle cx="916" cy="375" r="18" fill="#ff2d46"/>
+    <text x="916" y="382" text-anchor="middle" font-size="17">&#128737;</text>
+    <text x="948" y="360" fill="#e6edf3" font-size="17" font-weight="700">Auth + Admin gate</text>
+    <text x="948" y="383" fill="#8b98a8" font-size="12.5">requireSession &#8226; requireAdmin</text>
+    <text x="948" y="403" fill="#6b7889" font-size="12">Edit/delete enforced server-side (403), not just hidden</text>
+    <text x="1368" y="348" text-anchor="end" fill="#6b7889" font-size="11">routes.js</text>
+  </g>
+  <!-- Vault client -->
+  <g filter="url(#cardShadow)">
+    <rect x="880" y="438" width="504" height="90" rx="12" fill="#161d26" stroke="#ff2d46" stroke-opacity="0.5"/>
+    <circle cx="916" cy="483" r="18" fill="#ff2d46"/>
+    <text x="916" y="490" text-anchor="middle" font-size="17">&#128230;</text>
+    <text x="948" y="468" fill="#e6edf3" font-size="17" font-weight="700">Vault client</text>
+    <text x="948" y="491" fill="#8b98a8" font-size="12.5">auth &#8226; VQL &#8226; actions &#8226; CRUD &#8226; hierarchy</text>
+    <text x="948" y="511" fill="#6b7889" font-size="12">Bottom-up deletion planning &#8226; safe VQL builder</text>
+    <text x="1368" y="456" text-anchor="end" fill="#6b7889" font-size="11">vaultClient.js</text>
+  </g>
+  <!-- NL->VQL pipeline -->
+  <g filter="url(#cardShadow)">
+    <rect x="880" y="546" width="504" height="90" rx="12" fill="#161d26" stroke="#ff2d46" stroke-opacity="0.5"/>
+    <circle cx="916" cy="591" r="18" fill="#ff2d46"/>
+    <text x="916" y="598" text-anchor="middle" font-size="17">&#129504;</text>
+    <text x="948" y="576" fill="#e6edf3" font-size="17" font-weight="700">NL&#8594;VQL pipeline</text>
+    <text x="948" y="599" fill="#8b98a8" font-size="12.5">Constrained JSON spec &#8594; validate vs metadata &#8594; VQL</text>
+    <text x="948" y="619" fill="#6b7889" font-size="12">Sibling-object fallback when the picked object is empty</text>
+    <text x="1368" y="564" text-anchor="end" fill="#6b7889" font-size="11">nlSearch.js</text>
+  </g>
+  <!-- Galileo client -->
+  <g filter="url(#cardShadow)">
+    <rect x="880" y="770" width="504" height="82" rx="12" fill="#161d26" stroke="#ff2d46" stroke-opacity="0.5"/>
+    <circle cx="916" cy="811" r="18" fill="#ff2d46"/>
+    <text x="916" y="818" text-anchor="middle" font-size="17">&#129302;</text>
+    <text x="948" y="802" fill="#e6edf3" font-size="17" font-weight="700">Galileo client</text>
+    <text x="948" y="825" fill="#8b98a8" font-size="12.5">Env-driven &amp; provider-agnostic &#8226; API key server-side only</text>
+    <text x="1368" y="788" text-anchor="end" fill="#6b7889" font-size="11">galileoClient.js</text>
+  </g>
+  <!-- Session store -->
+  <g filter="url(#cardShadow)">
+    <rect x="1044" y="686" width="340" height="72" rx="12" fill="#161d26" stroke="#ffb020" stroke-opacity="0.5"/>
+    <circle cx="1078" cy="722" r="17" fill="#ffb020"/>
+    <text x="1078" y="729" text-anchor="middle" font-size="16">&#127850;</text>
+    <text x="1108" y="714" fill="#e6edf3" font-size="16" font-weight="700">Session store</text>
+    <text x="1108" y="735" fill="#8b98a8" font-size="12">cookie token &#8594; Vault session (in-memory, 30-min TTL)</text>
+    <text x="1368" y="702" text-anchor="end" fill="#6b7889" font-size="11">sessionStore.js</text>
+  </g>
+
+  <!-- EXTERNAL NODES -->
+  <!-- Veeva Vault -->
+  <g filter="url(#cardShadow)">
+    <rect x="1476" y="380" width="352" height="120" rx="14" fill="#161d26" stroke="#35d07f" stroke-opacity="0.6"/>
+    <circle cx="1516" cy="440" r="24" fill="#35d07f"/>
+    <text x="1516" y="449" text-anchor="middle" font-size="24" font-weight="800" fill="#0f141a">V</text>
+    <text x="1552" y="424" fill="#e6edf3" font-size="20" font-weight="700">Veeva Vault RIM</text>
+    <text x="1552" y="450" fill="#8b98a8" font-size="13">REST API v24.1 &#8226; system of record</text>
+    <text x="1552" y="472" fill="#6b7889" font-size="12">sb-roche-rim-development</text>
+    <text x="1552" y="490" fill="#6b7889" font-size="12">Tool stores no RIM data itself</text>
+  </g>
+  <!-- Galileo -->
+  <g filter="url(#cardShadow)">
+    <rect x="1476" y="520" width="352" height="120" rx="14" fill="#161d26" stroke="#b07cff" stroke-opacity="0.6"/>
+    <circle cx="1516" cy="580" r="24" fill="#b07cff"/>
+    <text x="1516" y="589" text-anchor="middle" font-size="24" fill="#0f141a">&#10022;</text>
+    <text x="1552" y="564" fill="#e6edf3" font-size="20" font-weight="700">Roche Galileo</text>
+    <text x="1552" y="590" fill="#8b98a8" font-size="13">AI Gateway (Portkey) &#8226; Gemini</text>
+    <text x="1552" y="612" fill="#6b7889" font-size="12">us.aigw.galileo.roche.com</text>
+    <text x="1552" y="630" fill="#6b7889" font-size="12">gemini-2.5-flash &#8226; NL &#8594; search spec only</text>
+  </g>
+
+  <!-- ================= FOOTER / LEGEND ================= -->
+  <g>
+    <line x1="56" y1="1000" x2="1864" y2="1000" stroke="#2a3542" stroke-width="1"/>
+    <!-- flow legend -->
+    <line x1="72" y1="1035" x2="112" y2="1035" stroke="#6b7889" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="122" y="1040" fill="#8b98a8" font-size="14">Request / data flow</text>
+
+    <line x1="300" y1="1035" x2="340" y2="1035" stroke="#b07cff" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#arrowAI)"/>
+    <text x="350" y="1040" fill="#8b98a8" font-size="14">AI (NL&#8594;VQL) path</text>
+
+    <rect x="560" y="1026" width="16" height="16" rx="3" fill="#4aa3ff" fill-opacity="0.5"/>
+    <text x="584" y="1040" fill="#8b98a8" font-size="14">Client</text>
+    <rect x="660" y="1026" width="16" height="16" rx="3" fill="#ff2d46" fill-opacity="0.5"/>
+    <text x="684" y="1040" fill="#8b98a8" font-size="14">Server</text>
+    <rect x="762" y="1026" width="16" height="16" rx="3" fill="#ffb020" fill-opacity="0.6"/>
+    <text x="786" y="1040" fill="#8b98a8" font-size="14">Store</text>
+    <rect x="852" y="1026" width="16" height="16" rx="3" fill="#35d07f" fill-opacity="0.6"/>
+    <text x="876" y="1040" fill="#8b98a8" font-size="14">External SaaS</text>
+    <rect x="988" y="1026" width="16" height="16" rx="3" fill="#b07cff" fill-opacity="0.6"/>
+    <text x="1012" y="1040" fill="#8b98a8" font-size="14">External LLM</text>
+
+    <text x="1864" y="1040" text-anchor="end" fill="#6b7889" font-size="13">Node 20 &#8226; Express (ESM) &#8226; Vite 7 + React 18 &#8226; npm workspaces monorepo</text>
+  </g>
+</svg>
