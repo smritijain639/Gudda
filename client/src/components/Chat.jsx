@@ -13,6 +13,10 @@ import {
 let idSeq = 0;
 const nextId = () => `m${Date.now()}_${idSeq++}`;
 
+// Where users can raise a support ticket when the assistant can't complete a
+// request (e.g. an unexpected error or a Vault-side block it can't resolve).
+const SUPPORT_URL = 'https://roche.service-now.com/now/nav/ui/home';
+
 const SUGGESTIONS = [
   'Show submissions in draft state',
   'Find registrations for my product',
@@ -67,7 +71,12 @@ export default function Chat({ username, messages = [], onMessagesChange }) {
         const result = await api.changeSubmissionState(q);
         renderPipelineResult(result);
       } catch (err) {
-        push({ role: 'bot', ok: false, text: `Compliance pipeline error: ${err.message}` });
+        push({
+          role: 'bot',
+          text:
+            `Sorry — I couldn't process that request right now. Please try again in a moment.`,
+        });
+        push({ role: 'bot', kind: 'support' });
       } finally {
         setBusy(false);
         inputRef.current?.focus();
@@ -204,45 +213,78 @@ export default function Chat({ username, messages = [], onMessagesChange }) {
   // Render the outcome of the 4-agent compliance pipeline as chat messages:
   // the decision line plus the GxP audit narrative.
   function renderPipelineResult(result) {
-    const { status, agent1, verify, execute, audit } = result || {};
+    const { status, agent1, verify, execute } = result || {};
+
+    const submission = verify?.document?.submission_id || agent1?.document_id || 'that submission';
 
     if (status === 'out_of_scope') {
+      // The assistant can only change submission lifecycle states. Anything
+      // else is outside what it can do — point the user to support rather than
+      // guessing at a rephrase.
       push({
         role: 'bot',
         text:
-          `That doesn’t look like a submission state-change request, so I didn’t run the ` +
-          `compliance pipeline. ${agent1?.reasoning || ''}`.trim(),
+          `That's outside what I can help with here — I can only change a submission's ` +
+          `lifecycle state. For anything else, our support team can assist.`,
       });
+      push({ role: 'bot', kind: 'support' });
+      return;
+    }
+
+    if (status === 'already_in_state') {
+      const stateLabel = agent1?.target_state || prettyState(execute?.confirmed_status);
+      push({
+        role: 'bot',
+        text: `${submission} is already in “${stateLabel}”, so there's nothing to change.`,
+      });
+      push({ role: 'bot', kind: 'trace', trace: result });
       return;
     }
 
     if (status === 'denied') {
+      // A denial is a normal, expected outcome — keep it conversational, not an error.
       push({
         role: 'bot',
-        ok: false,
-        text: `⚠️ Request denied by compliance. ${verify?.reason || ''}`.trim(),
+        text:
+          `I'm not able to make that change. ${humanizeReason(verify?.reason) || ''}`.trim(),
       });
+      // If it's a permission issue the user can request access via a support
+      // ticket (with the justification already explained above).
+      if (isPermissionDenial(verify?.reason)) {
+        push({ role: 'bot', kind: 'support', supportLabel: 'Request access via support ticket ↗' });
+      }
     } else if (status === 'executed') {
-      const doc = verify?.document || {};
+      // Prefer the human-friendly state the user asked for; fall back to a
+      // prettified version of the confirmed technical state name.
+      const stateLabel = agent1?.target_state || prettyState(execute?.confirmed_status);
       push({
         role: 'bot',
         ok: true,
-        text:
-          `✅ Approved and executed. Moved ${doc.submission_id || 'the submission'} to ` +
-          `“${execute?.confirmed_status || agent1?.target_state || 'the requested state'}”.`,
+        text: `✅ Approved successfully — ${submission} is now in “${stateLabel || 'the requested state'}”.`,
       });
     } else {
-      push({
-        role: 'bot',
-        ok: false,
-        text: `Execution failed: ${execute?.message || 'unknown error'}.`,
-      });
+      // Execution didn't complete. If it's a known/explainable situation (e.g.
+      // the requested transition isn't valid from the current state), guide the
+      // user. Otherwise it's an unexpected error — point them to support.
+      const known = isExplainableExecuteFailure(execute?.message);
+      if (known) {
+        push({
+          role: 'bot',
+          text: humanizeExecuteMessage(execute?.message, submission),
+        });
+      } else {
+        push({
+          role: 'bot',
+          text:
+            `I ran into an unexpected problem while updating ${submission}, so the change ` +
+            `didn't go through. Please try again in a moment.`,
+        });
+        push({ role: 'bot', kind: 'support' });
+      }
     }
 
-    // Always surface the GxP audit narrative when present.
-    if (audit) {
-      push({ role: 'bot', text: audit, kind: 'audit' });
-    }
+    // Note: the GxP audit narrative is shown inside the "Agent details & logs"
+    // trace (Agent 4), so we don't push a separate audit bubble here.
 
     // Expandable per-agent trace: what each of the 4 agents decided and did.
     push({ role: 'bot', kind: 'trace', trace: result });
@@ -351,6 +393,18 @@ function Message({ m, onActivity }) {
       <div className="bubble-group">
         {m.kind === 'trace' ? (
           <AgentTrace result={m.trace} />
+        ) : m.kind === 'support' ? (
+          <div className="bubble support-bubble">
+            <span>{m.supportText || 'Our support team can help with this.'}</span>
+            <a
+              className="support-link"
+              href={SUPPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {m.supportLabel || 'Raise a support ticket ↗'}
+            </a>
+          </div>
         ) : (
           <div
             className={`bubble ${m.ok === false ? 'bubble-error' : ''} ${
@@ -424,7 +478,7 @@ function AgentTrace({ result }) {
           ['Affiliate Manager', bool(c.is_affiliate_manager)],
           ['Requesting user', verify.requesting_user?.federated_id || '—'],
           ['Vault user id', verify.requesting_user?.resolved_vault_user_id || '—'],
-          ['Current state', verify.document?.current_state || '—'],
+          ['Current state', prettyState(verify.document?.current_state) || '—'],
           ['Decision', verify.reason || '—'],
         ]
       )
@@ -443,7 +497,7 @@ function AgentTrace({ result }) {
         [
           ['Status', execute.execution_status],
           ['Action invoked', execute.action_invoked || '—'],
-          ['Confirmed state', execute.confirmed_status || '—'],
+          ['Confirmed state', prettyState(execute.confirmed_status) || '—'],
           ['Message', execute.message || '—'],
         ]
       )
@@ -498,6 +552,64 @@ function AgentTrace({ result }) {
 
 function bool(v) {
   return v ? 'Pass' : 'Fail';
+}
+
+// True when a denial is specifically about the user lacking the required role.
+function isPermissionDenial(reason) {
+  return /affiliate_manager__c|affiliate manager|does not hold/i.test(reason || '');
+}
+
+// A denial reason from Agent 2 can mention a missing role. Soften the phrasing
+// for the end user without changing the underlying meaning.
+function humanizeReason(reason) {
+  if (!reason) return '';
+  if (/affiliate_manager__c|affiliate manager/i.test(reason)) {
+    return `You don't have the Affiliate Manager permission on this submission, which is required to change its state. If you believe you should, please contact your Vault administrator.`;
+  }
+  if (/not found/i.test(reason)) {
+    return `I couldn't find that submission — please double-check the name or ID.`;
+  }
+  if (/could not resolve/i.test(reason)) {
+    return `I couldn't confirm your Vault account for this request. Please try signing out and back in.`;
+  }
+  return reason;
+}
+
+// True when an execution failure is a normal, explainable situation we can
+// guide the user through (rather than an unexpected system error).
+function isExplainableExecuteFailure(message) {
+  if (!message) return false;
+  return /No lifecycle action|No target state|ambiguous|Available transitions/i.test(message);
+}
+
+// Rephrase a known execution message conversationally, listing the states the
+// user can actually move to.
+function humanizeExecuteMessage(message, submission) {
+  const m = String(message || '');
+  const match = m.match(/Available transitions:\s*([^.]+)\.?/i);
+  const options = match
+    ? match[1]
+        .split(',')
+        .map((s) => s.replace(/^\s*change state to\s*/i, '').trim())
+        .filter(Boolean)
+    : [];
+  const base = `That state change isn't available for ${submission} from its current state.`;
+  if (options.length) {
+    return `${base} Right now you can move it to: ${options.join(', ')}.`;
+  }
+  return `${base} There are no state changes available right now.`;
+}
+
+// Turn a Vault state name (e.g. "in_progress_state__c") into a readable label
+// ("In Progress"). Best-effort fallback when a friendly label isn't available.
+function prettyState(name) {
+  if (!name) return '';
+  return String(name)
+    .replace(/_state__[cv]$/i, '')
+    .replace(/__[cv]$/i, '')
+    .replace(/_/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
 function stateLabel(state) {

@@ -154,6 +154,54 @@ test('agent3Execute invokes the matching action and confirms the new state', asy
   assert.equal(r.confirmed_status, 'in_progress_state__c');
 });
 
+test('pipeline reports already_in_state when the record is in the requested state', async () => {
+  // Make galileoClient consider itself configured; the fetch stub returns the
+  // canned completion so no real network call happens.
+  const prevUrl = process.env.GALILEO_URL;
+  const prevKey = process.env.GALILEO_API_KEY;
+  process.env.GALILEO_URL = 'https://example.test/v1/chat/completions';
+  process.env.GALILEO_API_KEY = 'test-key';
+  // Stub Galileo (Agent 1 interpret + Agent 4 audit) via global fetch.
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    // Galileo chat completion
+    if (/aigw|chat\/completions/i.test(u)) {
+      const content = JSON.stringify({
+        intent: 'change_submission_state',
+        document_id: 'SUB - X',
+        target_state: 'Deferred',
+        confidence: 1,
+        reasoning: 'x',
+      });
+      return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected fetch ${u}`);
+  };
+  try {
+    const { runStateChangePipeline } = await import('./stateChangePipeline.js');
+    const vault = fakeVault({
+      submission: { id: '00S1', name__v: 'SUB - X', state__v: 'deferred_state__c' },
+      user: { vaultUserId: 999, federatedId: 'jdoe' },
+      roles: [{ name: 'affiliate_manager__c', users: [999] }],
+    });
+    const r = await runStateChangePipeline(vault, {
+      message: 'Change state of submission SUB - X to Deferred',
+      requesterLogin: 'x@y.com',
+    });
+    assert.equal(r.status, 'already_in_state');
+    assert.equal(r.execute.execution_status, 'NO_CHANGE');
+    assert.equal(r.execute.action_invoked, null);
+  } finally {
+    globalThis.fetch = realFetch;
+    process.env.GALILEO_URL = prevUrl;
+    process.env.GALILEO_API_KEY = prevKey;
+  }
+});
+
 test('agent3Execute fails cleanly when no action matches the target', async () => {
   const vault = fakeVault({
     actions: [{ name: 'act1', label: 'Change State to Planned', type: 'state_change' }],

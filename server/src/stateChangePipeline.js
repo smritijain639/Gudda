@@ -194,6 +194,14 @@ function normState(s) {
     .trim();
 }
 
+// True when a record's current state matches the requested target state.
+// Compares tolerantly: current is a state name ("deferred_state__c") while the
+// target is usually a label ("Deferred").
+function isSameState(currentState, targetState) {
+  if (!currentState || !targetState) return false;
+  return normState(currentState) === normState(targetState);
+}
+
 function findActionForState(actions, targetState) {
   const stateChanges = (actions || []).filter(
     (a) => (a.type || '').toLowerCase() === 'state_change'
@@ -353,6 +361,21 @@ export async function runStateChangePipeline(vault, { message, requesterLogin })
   if (!verify.execution_approved) {
     const audit = await agent4Audit({ agent1, verify, execute: null });
     return { status: 'denied', agent1, verify, execute: null, audit };
+  }
+
+  // No-op short-circuit: the record is already in the requested state, so there
+  // is nothing to change. This is a friendly, expected outcome — not an error.
+  if (agent1.target_state && isSameState(verify.document.current_state, agent1.target_state)) {
+    const execute = {
+      execution_status: 'NO_CHANGE',
+      submission_id: verify.document.submission_id,
+      internal_id: verify.document.internal_id,
+      action_invoked: null,
+      confirmed_status: verify.document.current_state,
+      message: `${verify.document.submission_id} is already in the requested state.`,
+    };
+    const audit = await agent4Audit({ agent1, verify, execute });
+    return { status: 'already_in_state', agent1, verify, execute, audit };
   }
 
   // Agent 3 — Execute.

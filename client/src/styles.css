@@ -614,6 +614,29 @@ button {
   margin-bottom: 6px;
 }
 
+/* --- Support ticket prompt --- */
+.support-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.support-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.support-link:hover {
+  filter: brightness(1.08);
+}
+
 /* --- Agent trace (4-agent pipeline details) --- */
 .trace {
   border: 1px solid var(--border);
