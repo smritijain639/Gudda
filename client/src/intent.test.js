@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectSmallTalk, detectActionIntent, actionPromptFor } from './intent.js';
+import {
+  detectSmallTalk,
+  detectActionIntent,
+  actionPromptFor,
+  detectTargetState,
+  matchTargetState,
+} from './intent.js';
 
 test('greetings are detected and personalized', () => {
   for (const g of ['Hi', 'hello', 'Hey!', 'good morning', 'HELLO', ' hi ']) {
@@ -65,4 +71,40 @@ test('actionPromptFor produces a pick-list prompt for delete', () => {
   assert.match(p, /delete/i);
   assert.match(p, /3/);
   assert.match(p, /submission__v/);
+});
+
+test('detectTargetState extracts the state named after "to"', () => {
+  assert.equal(
+    detectTargetState('Change lifecycle state of submission SUB - IMA-2026-01318 to Planned'),
+    'Planned'
+  );
+  assert.equal(detectTargetState('move it to In Progress'), 'In Progress');
+  assert.equal(detectTargetState('set state to Inactive.'), 'Inactive');
+  assert.equal(detectTargetState('promote SUB-1 into Ready for Submission'), 'Ready for Submission');
+});
+
+test('detectTargetState returns null when no target is named', () => {
+  assert.equal(detectTargetState('change the status of SUB-1'), null);
+  assert.equal(detectTargetState('show submissions'), null);
+  assert.equal(detectTargetState(''), null);
+  // Overly long trailing phrase is not treated as a state label.
+  assert.equal(
+    detectTargetState('to a really long sentence that clearly is not a lifecycle state label at all here'),
+    null
+  );
+});
+
+test('matchTargetState matches by label or state name, tolerant of casing/spacing', () => {
+  const states = [
+    { name: 'planned_state__c', label: 'Planned' },
+    { name: 'in_progress_state__c', label: 'In Progress' },
+    { name: 'inactive_state__c', label: 'Inactive' },
+  ];
+  assert.equal(matchTargetState(states, 'Planned').name, 'planned_state__c');
+  assert.equal(matchTargetState(states, 'in progress').name, 'in_progress_state__c');
+  assert.equal(matchTargetState(states, 'INACTIVE').name, 'inactive_state__c');
+  // prefix match
+  assert.equal(matchTargetState(states, 'plan').name, 'planned_state__c');
+  assert.equal(matchTargetState(states, 'nope'), null);
+  assert.equal(matchTargetState(states, ''), null);
 });

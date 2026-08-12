@@ -5,11 +5,18 @@ import Chat from './components/Chat.jsx';
 import ActivityLog from './components/ActivityLog.jsx';
 import BotMark from './components/BotMark.jsx';
 
+let chatSeq = 0;
+const newChatId = () => `c${Date.now()}_${chatSeq++}`;
+const emptyChat = () => ({ id: newChatId(), title: 'New chat', messages: [] });
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
   const [view, setView] = useState('chat'); // chat | audit
-  const [chatKey, setChatKey] = useState(0); // bump to start a new chat
+  // Chat sessions live here (not inside <Chat/>) so they survive view toggles
+  // and starting new chats. Persisted per user in localStorage.
+  const [chats, setChats] = useState([emptyChat()]);
+  const [activeId, setActiveId] = useState(() => chats[0].id);
   const [theme, setTheme] = useState(
     () => localStorage.getItem('vsbot-theme') || 'dark'
   );
@@ -26,6 +33,36 @@ export default function App() {
       .catch(() => setSession(null))
       .finally(() => setChecking(false));
   }, []);
+
+  // Load persisted chats for this user once the session is known.
+  const username = session?.user?.username || null;
+  useEffect(() => {
+    if (!username) return;
+    try {
+      const raw = localStorage.getItem(`vsbot-chats-${username}`);
+      const saved = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(saved) && saved.length) {
+        setChats(saved);
+        setActiveId(saved[0].id);
+        return;
+      }
+    } catch {
+      /* ignore corrupt storage */
+    }
+    const fresh = emptyChat();
+    setChats([fresh]);
+    setActiveId(fresh.id);
+  }, [username]);
+
+  // Persist chats whenever they change.
+  useEffect(() => {
+    if (!username) return;
+    try {
+      localStorage.setItem(`vsbot-chats-${username}`, JSON.stringify(chats));
+    } catch {
+      /* storage full / unavailable — non-fatal */
+    }
+  }, [username, chats]);
 
   async function handleLogout() {
     try {
@@ -47,12 +84,44 @@ export default function App() {
     return <Login onLoggedIn={setSession} />;
   }
 
-  const username = session.user?.username || 'there';
-  const initials = username.slice(0, 2).toUpperCase();
+  const displayName = session.user?.username || 'there';
+  const initials = displayName.slice(0, 2).toUpperCase();
+  const activeChat = chats.find((c) => c.id === activeId) || chats[0];
 
   function newChat() {
     setView('chat');
-    setChatKey((k) => k + 1);
+    // Reuse an existing empty chat instead of stacking blank ones.
+    const existingEmpty = chats.find((c) => c.messages.length === 0);
+    if (existingEmpty) {
+      setActiveId(existingEmpty.id);
+      return;
+    }
+    const fresh = emptyChat();
+    setChats((cs) => [fresh, ...cs]);
+    setActiveId(fresh.id);
+  }
+
+  function selectChat(id) {
+    setView('chat');
+    setActiveId(id);
+  }
+
+  // Called by <Chat/> whenever its message list changes. Updates the active
+  // chat's messages and derives a title from the first user message.
+  function updateActiveChat(messages) {
+    setChats((cs) =>
+      cs.map((c) => {
+        if (c.id !== activeChat.id) return c;
+        const firstUser = messages.find((m) => m.role === 'user');
+        const title =
+          c.title !== 'New chat'
+            ? c.title
+            : firstUser
+              ? firstUser.text.slice(0, 40) + (firstUser.text.length > 40 ? '…' : '')
+              : 'New chat';
+        return { ...c, messages, title };
+      })
+    );
   }
 
   return (
@@ -72,21 +141,24 @@ export default function App() {
 
         <div className="side-section">RECENT</div>
         <nav className="recents">
-          <button type="button" className="recent active">
-            <ChatIcon /> Current session
-          </button>
+          {chats.map((c) => (
+            <button
+              type="button"
+              key={c.id}
+              className={c.id === activeChat.id && view === 'chat' ? 'recent active' : 'recent'}
+              onClick={() => selectChat(c.id)}
+              title={c.title}
+            >
+              <ChatIcon /> <span className="recent-title">{c.title}</span>
+            </button>
+          ))}
         </nav>
 
         <div className="side-foot">
           <div className="user-row">
             <div className="avatar-circle">{initials}</div>
             <div className="user-lines">
-              <strong>{username}</strong>
-              <span className="muted">
-                {session.objectCount != null
-                  ? `${session.objectCount} objects available`
-                  : 'Business Admin scope'}
-              </span>
+              <strong>{displayName}</strong>
             </div>
             <button
               type="button"
@@ -103,7 +175,6 @@ export default function App() {
               </svg>
             </button>
           </div>
-          <div className="conn-pill">● Business Admin connected</div>
         </div>
       </aside>
 
@@ -112,7 +183,7 @@ export default function App() {
           <div className="topbar-left">
             <BotMark size={22} />
             <span className="topbar-title">
-              {view === 'chat' ? 'New chat' : 'Activity log'}
+              {view === 'chat' ? activeChat.title : 'Activity log'}
             </span>
           </div>
           <div className="topbar-right">
@@ -147,7 +218,12 @@ export default function App() {
 
         <main className="main-content">
           {view === 'chat' ? (
-            <Chat key={chatKey} username={username} />
+            <Chat
+              key={activeChat.id}
+              username={displayName}
+              messages={activeChat.messages}
+              onMessagesChange={updateActiveChat}
+            />
           ) : (
             <div className="audit-wrap">
               <ActivityLog />

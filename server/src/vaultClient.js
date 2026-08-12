@@ -23,7 +23,13 @@ const VAULT_DNS = process.env.VAULT_DNS || 'https://sb-roche-rim-development.vee
 
 // Vault returns responseStatus: "SUCCESS" | "FAILURE" on every call.
 function assertSuccess(body, fallbackMessage) {
-  if (body && body.responseStatus === 'SUCCESS') return body;
+  // Vault returns SUCCESS on success. It also returns WARNING for non-fatal
+  // conditions (e.g. "Duplicate query execution detected") while still
+  // including valid data — treat WARNING as success so throttling notices
+  // don't surface as errors to the user.
+  if (body && (body.responseStatus === 'SUCCESS' || body.responseStatus === 'WARNING')) {
+    return body;
+  }
   const errors = (body && body.errors) || [];
   const message =
     errors.map((e) => e.message).filter(Boolean).join('; ') ||
@@ -191,6 +197,43 @@ export function createVaultClient({ vaultDns, sessionId, apiVersion = DEFAULT_AP
         label: a.label || a.label__v || a.name || a.name__v,
         ...a,
       }));
+    },
+
+    // Role assignments on a specific record instance.
+    // GET /vobjects/{object}/{id}/roles ->
+    //   { data: [{ name, users: [<vaultUserId>], groups: [...], ... }] }
+    // Returns the raw role rows so callers can check membership.
+    async recordRoles(objectName, recordId) {
+      const { body } = await request(
+        `/vobjects/${encodeURIComponent(objectName)}/${encodeURIComponent(recordId)}/roles`
+      );
+      assertSuccess(body, 'Could not load record roles');
+      return body.data || [];
+    },
+
+    // Resolve an app-login identity (username/email) to their Vault user
+    // record, including federated_id__v and numeric Vault user id. Used to
+    // attribute an operation to the real requesting user rather than the
+    // Business Admin service account. Returns null when not found.
+    //
+    // Note: the `users` object does not support MAXROWS; use PAGESIZE.
+    async resolveUserByLogin(login) {
+      if (!login) return null;
+      const safe = escapeVql(login);
+      const vql =
+        `SELECT id, user_name__v, user_email__v, federated_id__v ` +
+        `FROM users ` +
+        `WHERE user_name__v = '${safe}' OR user_email__v = '${safe}' ` +
+        `PAGESIZE 1`;
+      const { data } = await this.query(vql);
+      const row = data[0];
+      if (!row) return null;
+      return {
+        vaultUserId: row.id,
+        userName: row.user_name__v || null,
+        userEmail: row.user_email__v || null,
+        federatedId: row.federated_id__v || null,
+      };
     },
 
     // All lifecycle states configured for an object, regardless of the

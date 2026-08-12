@@ -41,6 +41,15 @@ test('assertSuccess falls back when no error messages present', () => {
   assert.throws(() => assertSuccess({ responseStatus: 'FAILURE' }, 'fallback msg'), /fallback msg/);
 });
 
+test('assertSuccess treats WARNING (e.g. duplicate-query throttle) as success', () => {
+  const body = {
+    responseStatus: 'WARNING',
+    warnings: [{ type: 'DUPLICATE', message: 'Duplicate query execution detected.' }],
+    data: [{ id: 'r1' }],
+  };
+  assert.equal(assertSuccess(body, 'x'), body);
+});
+
 // --- fetch-backed tests using a stub global fetch --------------------------
 
 function stubFetch(handler) {
@@ -279,6 +288,62 @@ test('client.lifecycleOverview marks current state and matches reachable actions
     // Non-state-change actions surfaced separately.
     assert.equal(overview.otherActions.length, 1);
     assert.equal(overview.otherActions[0].name, 'del');
+  } finally {
+    restore();
+  }
+});
+
+test('client.recordRoles returns the role rows for a record', async () => {
+  const restore = stubFetch((url) => {
+    assert.match(url, /\/vobjects\/submission__v\/r1\/roles$/);
+    return jsonResponse({
+      responseStatus: 'SUCCESS',
+      data: [{ name: 'owner__v', users: [111], groups: [] }],
+    });
+  });
+  try {
+    const client = createVaultClient({ vaultDns: 'v.veevavault.com', sessionId: 's' });
+    const roles = await client.recordRoles('submission__v', 'r1');
+    assert.equal(roles.length, 1);
+    assert.equal(roles[0].name, 'owner__v');
+    assert.deepEqual(roles[0].users, [111]);
+  } finally {
+    restore();
+  }
+});
+
+test('client.resolveUserByLogin maps a login to vault id + federated id', async () => {
+  const restore = stubFetch((url, opts) => {
+    assert.match(url, /\/query$/);
+    // Uses PAGESIZE (users object rejects MAXROWS) and matches on name/email.
+    assert.match(opts.body, /PAGESIZE\+1|PAGESIZE%201/);
+    return jsonResponse({
+      responseStatus: 'SUCCESS',
+      data: [
+        {
+          id: 20861278,
+          user_name__v: 'manan.jain@sb-roche.com',
+          user_email__v: 'manan.jain@roche.com',
+          federated_id__v: 'jainm36',
+        },
+      ],
+    });
+  });
+  try {
+    const client = createVaultClient({ vaultDns: 'v.veevavault.com', sessionId: 's' });
+    const u = await client.resolveUserByLogin('manan.jain@sb-roche.com');
+    assert.equal(u.vaultUserId, 20861278);
+    assert.equal(u.federatedId, 'jainm36');
+  } finally {
+    restore();
+  }
+});
+
+test('client.resolveUserByLogin returns null when no user matches', async () => {
+  const restore = stubFetch(() => jsonResponse({ responseStatus: 'SUCCESS', data: [] }));
+  try {
+    const client = createVaultClient({ vaultDns: 'v.veevavault.com', sessionId: 's' });
+    assert.equal(await client.resolveUserByLogin('nobody@example.com'), null);
   } finally {
     restore();
   }

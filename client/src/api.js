@@ -51,6 +51,15 @@ export const api = {
   getLifecycle: (object, id) =>
     request(`/records/${encodeURIComponent(object)}/${encodeURIComponent(id)}/lifecycle`),
 
+  // Submission state change via the 4-agent compliance pipeline. The server
+  // interprets the plain-English message, verifies the Affiliate Manager role,
+  // executes the transition, and returns a GxP audit narrative.
+  changeSubmissionState: (message) =>
+    request('/submission/change-state', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }),
+
   executeAction: (object, id, action) =>
     request(`/records/${encodeURIComponent(object)}/${encodeURIComponent(id)}/actions/execute`, {
       method: 'POST',

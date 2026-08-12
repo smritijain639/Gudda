@@ -129,6 +129,50 @@ export function detectActionIntent(rawText) {
   return null;
 }
 
+// Extract the target lifecycle state a user named, so we can apply the
+// transition directly instead of showing a pick-list. Handles phrases like:
+//   "change lifecycle state of SUB-123 to Planned"
+//   "move it to In Progress"
+//   "set state to Inactive"
+// Returns the raw target phrase (e.g. "Planned") or null when none is named.
+// The caller validates it against the record's real lifecycle states.
+export function detectTargetState(rawText) {
+  const text = (rawText || '').trim();
+  if (!text) return null;
+  // Capture the phrase after the last "to"/"into" up to end of message.
+  const m = text.match(/\b(?:to|into)\s+([a-z0-9][a-z0-9 _/-]*?)\s*[.!?]*\s*$/i);
+  if (!m) return null;
+  const candidate = m[1].trim().replace(/[.!?]+$/, '').trim();
+  // State labels are short; anything long is almost certainly not a state.
+  if (!candidate || candidate.length > 40) return null;
+  return candidate;
+}
+
+// Normalize a state label/name for tolerant comparison.
+function normState(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/_state__c$/, '')
+    .replace(/[_\s]+/g, ' ')
+    .trim();
+}
+
+// Find the lifecycle state (from an overview.states list) that the user's
+// target phrase refers to. Matches on label or state name, exact first then
+// prefix. Returns the state object or null.
+export function matchTargetState(states, target) {
+  if (!Array.isArray(states) || !target) return null;
+  const t = normState(target);
+  if (!t) return null;
+  const cand = states.map((s) => ({ s, label: normState(s.label), name: normState(s.name) }));
+  return (
+    cand.find((c) => c.label === t || c.name === t)?.s ||
+    cand.find((c) => c.label.startsWith(t) || c.name.startsWith(t))?.s ||
+    cand.find((c) => c.label.includes(t))?.s ||
+    null
+  );
+}
+
 // Framing text shown above the record pick-list for a given action intent.
 export function actionPromptFor(intent, object, count) {
   const noun = count === 1 ? 'record' : 'records';

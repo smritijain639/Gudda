@@ -12,6 +12,7 @@ import { isGalileoConfigured } from './galileoClient.js';
 import { nlToVql, findPopulatedSibling } from './nlSearch.js';
 import { logAudit, getRecentAudit } from './auditLog.js';
 import { canAccessObject, filterObjects } from './permissions.js';
+import { runStateChangePipeline, SUBMISSION_OBJECT } from './stateChangePipeline.js';
 
 // The real user behind a request, for the audit trail. Since all Vault work
 // runs under the shared Business Admin account, this is the only link back to
@@ -427,6 +428,26 @@ export function buildRouter() {
       const { action } = req.body || {};
       if (!action) return res.status(400).json({ error: 'action is required.' });
 
+      // Submission state changes must go through the compliance pipeline
+      // (POST /submission/change-state). Direct execution is blocked so the
+      // GxP guardrails (Affiliate Manager role check) can't be bypassed.
+      if (object === SUBMISSION_OBJECT) {
+        logAudit({
+          actor: actorOf(req),
+          action: 'lifecycle-action',
+          object,
+          recordId: id,
+          detail: `action="${action}" blocked: use compliance pipeline`,
+          outcome: 'blocked',
+          ...clientInfo(req),
+        });
+        return res.status(403).json({
+          error:
+            'Submission state changes must go through the compliance pipeline. ' +
+            'Ask in plain English (e.g. "change state of <submission> to <state>").',
+        });
+      }
+
       try {
         const result = await req.vault.executeLifecycleAction(object, id, action);
         logAudit({
@@ -452,6 +473,54 @@ export function buildRouter() {
         });
         throw err;
       }
+    })
+  );
+
+  // Submission state change via the 4-agent compliance pipeline.
+  // Body: { message } — the user's plain-English request.
+  // This is the ONLY sanctioned path for changing a submission__v state.
+  router.post(
+    '/submission/change-state',
+    requireSession,
+    asyncHandler(async (req, res) => {
+      const { message } = req.body || {};
+      if (!message || !String(message).trim()) {
+        return res.status(400).json({ error: 'message is required.' });
+      }
+
+      const requesterLogin = req.session.loginUsername || null;
+      const result = await runStateChangePipeline(req.vault, {
+        message: String(message),
+        requesterLogin,
+      });
+
+      // Audit every pipeline run with its outcome and the compliance narrative.
+      const doc = result.verify?.document || {};
+      const outcome =
+        result.status === 'executed'
+          ? 'success'
+          : result.status === 'out_of_scope'
+            ? 'out_of_scope'
+            : result.status === 'denied'
+              ? 'denied'
+              : 'failure';
+      logAudit({
+        actor: actorOf(req),
+        action: 'submission-state-change',
+        object: SUBMISSION_OBJECT,
+        recordId: doc.internal_id || null,
+        detail:
+          `intent="${result.agent1?.intent}" ` +
+          `target="${result.agent1?.target_state || ''}" ` +
+          `submission="${doc.submission_id || result.agent1?.document_id || ''}" ` +
+          `-> ${result.execute?.confirmed_status || 'n/a'}`,
+        outcome,
+        error: result.status === 'execution_failed' ? result.execute?.message : undefined,
+        narrative: result.audit || undefined,
+        ...clientInfo(req),
+      });
+
+      res.json(result);
     })
   );
 

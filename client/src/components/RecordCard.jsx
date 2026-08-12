@@ -55,6 +55,23 @@ export default function RecordCard({ object, record, intent, onActivity }) {
     const actLabel = target?.label || chosen;
     setApplying(true);
     try {
+      // Submission state changes must go through the compliance pipeline, which
+      // enforces the Affiliate Manager role check. The chat surfaces the
+      // approval/denial and the GxP audit narrative.
+      if (object === 'submission__v') {
+        const result = await api.changeSubmissionState(
+          `Change lifecycle state of submission ${label} to ${target?.label || actLabel}`
+        );
+        onActivity?.({ pipeline: result });
+        if (result.status === 'executed') {
+          const overview = await api.getLifecycle(object, record.id);
+          setLifecycle(overview);
+          if (overview.currentStateLabel) setStatus(overview.currentStateLabel);
+          setChosen('');
+        }
+        return;
+      }
+
       await api.executeAction(object, record.id, chosen);
       onActivity?.({ ok: true, text: `Moved ${label} to “${actLabel}”.` });
       // Refresh the lifecycle picture so the new current state and its

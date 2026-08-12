@@ -371,6 +371,7 @@ button {
   border-radius: 9px;
   font-size: 14px;
   cursor: pointer;
+  min-width: 0;
 }
 .recent:hover {
   background: var(--panel);
@@ -379,6 +380,12 @@ button {
 .recent.active {
   background: var(--elev);
   color: var(--text);
+}
+.recent-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .side-foot {
   border-top: 1px solid var(--border);
@@ -590,6 +597,156 @@ button {
 }
 .bubble-error {
   color: var(--bad);
+}
+.bubble-audit {
+  border-left: 3px solid var(--primary);
+  background: var(--bg-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.audit-tag {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 6px;
+}
+
+/* --- Agent trace (4-agent pipeline details) --- */
+.trace {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.trace-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.trace-toggle:hover {
+  background: var(--elev);
+}
+.trace-caret {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  color: var(--muted);
+}
+.trace-caret.open {
+  transform: rotate(90deg);
+}
+.trace-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.trace-body {
+  border-top: 1px solid var(--border);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.trace-step {
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--muted);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg-1);
+}
+.trace-step.ok {
+  border-left-color: var(--good, #2ecc71);
+}
+.trace-step.deny {
+  border-left-color: var(--bad);
+}
+.trace-step.stop {
+  border-left-color: var(--bad);
+}
+.trace-step.skip {
+  border-left-color: var(--muted);
+  opacity: 0.85;
+}
+.trace-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.trace-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+.trace-dot.ok {
+  background: var(--good, #2ecc71);
+}
+.trace-dot.deny,
+.trace-dot.stop {
+  background: var(--bad);
+}
+.trace-name {
+  font-weight: 700;
+  font-size: 13px;
+}
+.trace-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.trace-badge {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--elev);
+  color: var(--muted);
+}
+.trace-badge.ok {
+  background: rgba(46, 204, 113, 0.15);
+  color: var(--good, #2ecc71);
+}
+.trace-badge.deny,
+.trace-badge.stop {
+  background: rgba(255, 90, 90, 0.15);
+  color: var(--bad);
+}
+.trace-kv {
+  margin: 8px 0 0;
+  display: grid;
+  gap: 3px;
+}
+.trace-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px;
+  font-size: 12.5px;
+  align-items: start;
+}
+.trace-row dt {
+  color: var(--muted);
+  font-weight: 600;
+}
+.trace-row dd {
+  margin: 0;
+  color: var(--text);
+  word-break: break-word;
 }
 .bubble-group {
   display: flex;
