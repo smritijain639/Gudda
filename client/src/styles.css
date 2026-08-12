@@ -1057,6 +1057,38 @@ button {
   color: var(--bad);
 }
 
+/* Activity log: toolbar, inline reasoning toggle, and expanded narrative. */
+.row-gap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--brand, #2563eb);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-btn:hover {
+  opacity: 0.85;
+}
+.audit-table tr.narrative-row td {
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--elev);
+}
+.narrative {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  padding: 4px 2px 8px;
+}
+
 /* Scrollbars */
 * {
   scrollbar-width: thin;

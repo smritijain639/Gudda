@@ -27,7 +27,20 @@ function actorOf(req) {
 function clientInfo(req) {
   return {
     ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null,
+    userAgent: req.headers['user-agent'] || null,
   };
+}
+
+// Turn a raw Vault state name (e.g. "in_review__c" or "approved_state") into a
+// human-readable label for the activity log. Safe on null/undefined.
+function prettifyState(state) {
+  if (!state) return null;
+  return String(state)
+    .replace(/__[a-z]$/i, '')
+    .replace(/_state$/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
 }
 
 const userCanAccessObject = (req, objectName) => canAccessObject(req.session, objectName);
@@ -514,6 +527,12 @@ export function buildRouter() {
           `target="${result.agent1?.target_state || ''}" ` +
           `submission="${doc.submission_id || result.agent1?.document_id || ''}" ` +
           `-> ${result.execute?.confirmed_status || 'n/a'}`,
+        // Friendly, structured fields so the activity log can render without
+        // parsing technical strings or exposing internal object/state names.
+        summary: `State change: ${doc.submission_id || result.agent1?.document_id || 'submission'}`,
+        targetName: doc.submission_id || result.agent1?.document_id || null,
+        requestedState: result.agent1?.target_state || null,
+        resultState: prettifyState(result.execute?.confirmed_status),
         outcome,
         error: result.status === 'execution_failed' ? result.execute?.message : undefined,
         narrative: result.audit || undefined,
