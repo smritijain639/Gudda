@@ -251,8 +251,19 @@ export async function agent3Execute(vault, { verify, targetState }) {
     };
   }
 
-  // Act: trigger the lifecycle action.
-  await vault.executeLifecycleAction(SUBMISSION_OBJECT, internalId, action.name);
+  // Act: trigger the lifecycle action. If Vault rejects it (e.g. mandatory
+  // fields missing / entry criteria not met), surface the exact reason and the
+  // structured error array rather than a generic failure.
+  try {
+    await vault.executeLifecycleAction(SUBMISSION_OBJECT, internalId, action.name);
+  } catch (err) {
+    return {
+      ...base,
+      action_invoked: action.name,
+      message: err.message,
+      errors: err.vaultErrors || [],
+    };
+  }
 
   // Confirm: read the state back.
   let confirmed = null;
@@ -389,7 +400,8 @@ export async function runStateChangePipeline(vault, { message, requesterLogin })
       internal_id: verify.document.internal_id,
       action_invoked: null,
       confirmed_status: null,
-      message: `Execution error: ${err.message}`,
+      message: err.message,
+      errors: err.vaultErrors || [],
     };
   }
 

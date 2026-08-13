@@ -67,7 +67,15 @@ function fakeVault(overrides = {}) {
       return overrides.actions || [];
     },
     async executeLifecycleAction() {
-      if (overrides.executeThrows) throw new Error('execute failed');
+      if (overrides.executeThrows) {
+        const err = new Error(
+          typeof overrides.executeThrows === 'string'
+            ? overrides.executeThrows
+            : 'execute failed'
+        );
+        if (overrides.vaultErrors) err.vaultErrors = overrides.vaultErrors;
+        throw err;
+      }
       return { responseStatus: 'SUCCESS' };
     },
   };
@@ -210,4 +218,22 @@ test('agent3Execute fails cleanly when no action matches the target', async () =
   assert.equal(r.execution_status, 'FAILED');
   assert.equal(r.action_invoked, null);
   assert.match(r.message, /No lifecycle action/);
+});
+
+test('agent3Execute surfaces Vault error message and errors when the action is rejected', async () => {
+  const vaultErrors = [
+    { type: 'INVALID_DATA', message: 'Required field [approval_date__c] is missing' },
+  ];
+  const vault = fakeVault({
+    actions: [{ name: 'act1', label: 'Change State to In Progress', type: 'state_change' }],
+    executeThrows: 'Required field [approval_date__c] is missing',
+    vaultErrors,
+  });
+  const r = await agent3Execute(vault, { verify: APPROVED, targetState: 'In Progress' });
+  assert.equal(r.execution_status, 'FAILED');
+  // The matched action is reported so the audit trail records what was attempted.
+  assert.equal(r.action_invoked, 'act1');
+  // The exact Vault message and structured errors are preserved for the UI.
+  assert.match(r.message, /approval_date__c/);
+  assert.deepEqual(r.errors, vaultErrors);
 });

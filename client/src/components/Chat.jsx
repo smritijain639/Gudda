@@ -9,6 +9,11 @@ import {
   detectTargetState,
   matchTargetState,
 } from '../intent.js';
+import {
+  isExplainableExecuteFailure,
+  missingRequiredFields,
+  cleanExecuteMessage,
+} from '../executeErrors.js';
 
 let idSeq = 0;
 const nextId = () => `m${Date.now()}_${idSeq++}`;
@@ -263,21 +268,36 @@ export default function Chat({ username, messages = [], onMessagesChange }) {
         text: `✅ Approved successfully — ${submission} is now in “${stateLabel || 'the requested state'}”.`,
       });
     } else {
-      // Execution didn't complete. If it's a known/explainable situation (e.g.
-      // the requested transition isn't valid from the current state), guide the
-      // user. Otherwise it's an unexpected error — point them to support.
+      // Execution didn't complete. Prefer showing the user the real reason:
+      //  1. Missing mandatory fields — list the exact field names Vault named.
+      //  2. A known/explainable transition problem (invalid transition, etc.).
+      //  3. Otherwise, an unexpected error — point them to support.
+      const missing = missingRequiredFields(execute);
       const known = isExplainableExecuteFailure(execute?.message);
-      if (known) {
+      if (missing.length) {
+        push({
+          role: 'bot',
+          text:
+            `I couldn't change ${submission} because some mandatory ` +
+            `${missing.length === 1 ? 'field is' : 'fields are'} missing: ` +
+            `${missing.join(', ')}. Please fill ${missing.length === 1 ? 'it' : 'them'} in ` +
+            `on the submission and try again.`,
+        });
+      } else if (known) {
         push({
           role: 'bot',
           text: humanizeExecuteMessage(execute?.message, submission),
         });
       } else {
+        // No structured field info, but still show the exact reason Vault gave
+        // rather than a vague "unexpected problem" message.
+        const detail = cleanExecuteMessage(execute?.message);
         push({
           role: 'bot',
-          text:
-            `I ran into an unexpected problem while updating ${submission}, so the change ` +
-            `didn't go through. Please try again in a moment.`,
+          text: detail
+            ? `I couldn't change ${submission}: ${detail}`
+            : `I ran into an unexpected problem while updating ${submission}, so the ` +
+              `change didn't go through. Please try again in a moment.`,
         });
         push({ role: 'bot', kind: 'support' });
       }
@@ -575,12 +595,7 @@ function humanizeReason(reason) {
   return reason;
 }
 
-// True when an execution failure is a normal, explainable situation we can
-// guide the user through (rather than an unexpected system error).
-function isExplainableExecuteFailure(message) {
-  if (!message) return false;
-  return /No lifecycle action|No target state|ambiguous|Available transitions/i.test(message);
-}
+
 
 // Rephrase a known execution message conversationally, listing the states the
 // user can actually move to.
