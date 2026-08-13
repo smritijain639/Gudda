@@ -275,14 +275,16 @@ export default function Chat({ username, messages = [], onMessagesChange }) {
       const missing = missingRequiredFields(execute);
       const known = isExplainableExecuteFailure(execute?.message);
       if (missing.length) {
+        // Show the exact blocking fields, then route to support rather than
+        // asking the user to edit the record themselves.
         push({
           role: 'bot',
           text:
             `I couldn't change ${submission} because some mandatory ` +
             `${missing.length === 1 ? 'field is' : 'fields are'} missing: ` +
-            `${missing.join(', ')}. Please fill ${missing.length === 1 ? 'it' : 'them'} in ` +
-            `on the submission and try again.`,
+            `${missing.join(', ')}.`,
         });
+        push({ role: 'bot', kind: 'support' });
       } else if (known) {
         push({
           role: 'bot',
