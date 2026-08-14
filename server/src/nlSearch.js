@@ -14,6 +14,7 @@ Respond with ONLY a single JSON object, no prose, no code fences.
 
 Schema:
 {
+  "understood": <boolean: true if the request is a clear data query you can map to an object; false otherwise>,
   "object": "<object api name, e.g. submission__v>",
   "term": "<optional free-text to match>",
   "termFields": ["<field api names to match the term against>"],
@@ -24,6 +25,8 @@ Schema:
 }
 
 Rules:
+- Set "understood": false when the request is gibberish, empty, a single stray token (e.g. "kk", "asdf"), or clearly not a request to find/list Vault records. In that case set "object" to null and omit the other keys. DO NOT guess an object just to have one.
+- Only set "understood": true when you can confidently map the request to a real object from the catalog.
 - Choose exactly ONE object that best fits the request, using an API name from the provided catalog.
 - When several objects share a concept (e.g. registration), prefer the SHORTEST, most general name (e.g. "registration__rim" or "registration__v") over a longer composite (e.g. "medicinal_product_registration__v") unless the request clearly asks for the specific variant.
 - For a simple "how many / list all X" request, return just the object with no term and no filters.
@@ -146,6 +149,13 @@ export async function nlToVql({ question, objects, getFields }) {
   });
   let spec = extractJson(firstOutput);
 
+  // The model can decline to map a request it doesn't understand (gibberish,
+  // stray tokens, non-queries). Respect that instead of forcing a guess — the
+  // caller shows a clear "I don't understand" message rather than random rows.
+  if (spec && (spec.understood === false || spec.object === null)) {
+    return { spec: { ...spec, object: null }, vql: null, understood: false, warnings: [] };
+  }
+
   // If we can load fields for the chosen object, validate against them.
   let knownFields = null;
   if (spec.object && typeof getFields === 'function') {
@@ -168,7 +178,7 @@ export async function nlToVql({ question, objects, getFields }) {
     limit: validSpec.limit || 25,
   });
 
-  return { spec: validSpec, vql, warnings };
+  return { spec: validSpec, vql, understood: true, warnings };
 }
 
 // Derive the main keyword(s) from a spec's object name, used to find sibling

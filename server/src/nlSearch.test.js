@@ -6,6 +6,7 @@ import {
   objectKeywords,
   rankSiblings,
   findPopulatedSibling,
+  nlToVql,
 } from './nlSearch.js';
 import { getByPath, isGalileoConfigured, galileoComplete } from './galileoClient.js';
 
@@ -83,6 +84,72 @@ test('validateSpec falls back termFields to name__v when all dropped', () => {
     { objectNames: ['submission__v'], knownFields: ['status__v'] }
   );
   assert.deepEqual(spec.termFields, ['name__v']);
+});
+
+// --- nlToVql understood/not-understood --------------------------------------
+
+// Run nlToVql with a scripted Galileo completion (via global fetch) so no real
+// network call happens.
+async function withScriptedGalileo(content, fn) {
+  const prev = {
+    url: process.env.GALILEO_URL,
+    key: process.env.GALILEO_API_KEY,
+    fetch: globalThis.fetch,
+  };
+  process.env.GALILEO_URL = 'https://example.test/v1/chat/completions';
+  process.env.GALILEO_API_KEY = 'test-key';
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  try {
+    return await fn();
+  } finally {
+    globalThis.fetch = prev.fetch;
+    if (prev.url == null) delete process.env.GALILEO_URL;
+    else process.env.GALILEO_URL = prev.url;
+    if (prev.key == null) delete process.env.GALILEO_API_KEY;
+    else process.env.GALILEO_API_KEY = prev.key;
+  }
+}
+
+test('nlToVql returns understood:false when the model declines to map the request', async () => {
+  const content = JSON.stringify({ understood: false, object: null });
+  await withScriptedGalileo(content, async () => {
+    const r = await nlToVql({
+      question: 'kk',
+      objects: [{ name: 'submission__v', label: 'Submission' }],
+    });
+    assert.equal(r.understood, false);
+    assert.equal(r.spec.object, null);
+    assert.equal(r.vql, null);
+  });
+});
+
+test('nlToVql treats a null object as not understood even without the flag', async () => {
+  const content = JSON.stringify({ object: null });
+  await withScriptedGalileo(content, async () => {
+    const r = await nlToVql({
+      question: 'asdf',
+      objects: [{ name: 'submission__v', label: 'Submission' }],
+    });
+    assert.equal(r.understood, false);
+    assert.equal(r.vql, null);
+  });
+});
+
+test('nlToVql builds a query when the model understands the request', async () => {
+  const content = JSON.stringify({ understood: true, object: 'submission__v' });
+  await withScriptedGalileo(content, async () => {
+    const r = await nlToVql({
+      question: 'show submissions',
+      objects: [{ name: 'submission__v', label: 'Submission' }],
+    });
+    assert.equal(r.understood, true);
+    assert.equal(r.spec.object, 'submission__v');
+    assert.match(r.vql, /FROM submission__v/i);
+  });
 });
 
 // --- sibling object matching ------------------------------------------------

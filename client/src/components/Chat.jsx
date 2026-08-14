@@ -92,6 +92,25 @@ export default function Chat({ username, messages = [], onMessagesChange }) {
     setBusy(true);
     try {
       const res = await api.nlSearch(q);
+
+      // The assistant couldn't map the request to a query (gibberish, a stray
+      // token, or not a data request). Say so and offer support instead of
+      // showing unrelated records.
+      if (res.understood === false) {
+        push({
+          role: 'bot',
+          text:
+            `I didn't understand that request. I can search Vault records ` +
+            `(e.g. "show submissions in draft") or change a submission's ` +
+            `lifecycle state. Please rephrase, or raise a support ticket if you ` +
+            `need help.`,
+        });
+        push({ role: 'bot', kind: 'support' });
+        setBusy(false);
+        inputRef.current?.focus();
+        return;
+      }
+
       const count = res.records?.length || 0;
       const notes = (res.warnings || []).join(' ');
 

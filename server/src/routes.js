@@ -311,11 +311,32 @@ export function buildRouter() {
 
       // Restrict the object catalog the LLM can choose from to the user's set.
       const objects = filterAllowedObjects(req, await req.vault.listObjects());
-      const { spec, vql, warnings } = await nlToVql({
+      const { spec, vql, understood, warnings } = await nlToVql({
         question,
         objects,
         getFields: (object) => req.vault.editableFields(object),
       });
+
+      // The model couldn't map the request to a query (gibberish, stray token,
+      // not a data request). Tell the client rather than returning random rows.
+      if (understood === false || !vql) {
+        logAudit({
+          actor: actorOf(req),
+          action: 'ai-search',
+          object: null,
+          detail: `question="${question.trim().slice(0, 200)}"`,
+          outcome: 'not_understood',
+          resultCount: 0,
+          ...clientInfo(req),
+        });
+        return res.json({
+          understood: false,
+          object: null,
+          records: [],
+          total: 0,
+          warnings: [],
+        });
+      }
 
       // Safety: never run against an object outside the user's permissions.
       if (!userCanAccessObject(req, spec.object)) {
@@ -357,6 +378,7 @@ export function buildRouter() {
       });
 
       res.json({
+        understood: true,
         object: usedObject,
         records: data,
         total: responseDetails.total ?? data.length,
